@@ -24,7 +24,7 @@ import torchvision.datasets as datasets
 
 import timm
 
-# assert timm.__version__ == "0.3.2"  # version check
+assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
 import util.misc as misc
@@ -153,7 +153,7 @@ def main(args):
     )
     
     # define the model
-    model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
+    model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)  # 这个写法属实牛
 
     model.to(device)
 
