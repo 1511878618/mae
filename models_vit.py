@@ -30,7 +30,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
             self.fc_norm = norm_layer(embed_dim)
 
             del self.norm  # remove the original norm
-
+        self.head = torch.nn.Sequential(torch.nn.BatchNorm1d(self.head.in_features, affine=False, eps=1e-6), self.head)
     def forward_features(self, x):
         B = x.shape[0]
         x = self.patch_embed(x)
@@ -45,14 +45,21 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
         if self.global_pool:
             x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
+            print(x.shape)
             outcome = self.fc_norm(x)
         else:
             x = self.norm(x)
             outcome = x[:, 0]
 
         return outcome
-
-
+    def forward_head(self, x, pre_logits: bool = False):
+        if self.global_pool:
+            x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
+            outcome = self.fc_norm(x)
+        else:
+            x = self.norm(x)
+            outcome = x[:, 0]
+        return outcome
 def vit_base_patch16(**kwargs):
     model = VisionTransformer(
         patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
