@@ -186,7 +186,7 @@ def get_args_parser():
     parser.add_argument(
         "--dist_url", default="env://", help="url used to set up distributed training"
     )
-    parser.add_argument("--test_img_path", default=None)
+    parser.add_argument("--test_img_path", default="./test_img/test.png")
 
     return parser
 
