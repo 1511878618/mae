@@ -28,27 +28,63 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 import matplotlib.pyplot as plt
 from PIL import Image
 
+imagenet_mean = np.array([0.485, 0.456, 0.406])
+imagenet_std = np.array([0.229, 0.224, 0.225])
 
+def show_image(image, title='', ax =None):
+    # image is [H, W, 3]
+    assert image.shape[2] == 3
+    if ax is None:
+        fig, ax = plt.subplots()
+    ax.imshow(torch.clip((image * imagenet_std + imagenet_mean) * 255, 0, 255).int())
+    ax.set_title(title, fontsize=16)
+    ax.axis('off')
+    return ax
 
-def load_image(filename):
-    
-    test_img = np.array(Image.open((filename)))/255
-    test_img = torch.Tensor(test_img).permute(2,0,1)
-    return test_img
+def run_one_image(img, model, mask_ratio=0.75,to_array=False, title=None):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def test_model_result(model, img,mask_ratio=0.75, to_array=True, title=None):
+    x = img
+    if not isinstance(img, torch.Tensor):
+        x = torch.tensor(x)
+
+    # make it a batch-like
+    if len(x.shape) == 3:
+        x = x.unsqueeze(dim=0)
+
+    x = torch.einsum('nhwc->nchw', x)
+    # run MAE
     model.eval()
     with torch.no_grad():
-        pred_img = model.forward(img, mask_ratio=mask_ratio)[1]
+        loss, y, mask = model(x.float().to(device), mask_ratio=mask_ratio)
+        y = model.unpatchify(y)
+        y = torch.einsum('nchw->nhwc', y).detach().cpu()
+    # visualize the mask
+    mask = mask.detach().cpu()
+    mask = mask.unsqueeze(-1).repeat(1, 1, model.patch_embed.patch_size[0]**2 *3)  # (N, H*W, p*p*3)
+    mask = model.unpatchify(mask)  # 1 is removing, 0 is keeping
+    mask = torch.einsum('nchw->nhwc', mask).detach().cpu()
+    
+    x = torch.einsum('nchw->nhwc', x)
 
-        recon_img = model.unpatchify(pred_img).detach()
-        print(recon_img.shape)
-        # transpose(1, 2, 0).squeeze(0).numpy()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-    ax1.imshow(img.squeeze(0).cpu().numpy().transpose(1, 2, 0))
-    ax1.set_title("raw image")
-    ax2.imshow(recon_img.squeeze(0).cpu().numpy().transpose(1, 2, 0))
-    ax2.set_title("reconstructed image")
+    # masked image
+    im_masked = x * (1 - mask)
+
+    # MAE reconstruction pasted with visible patches
+    im_paste = x * (1 - mask) + y * mask
+
+    # make the plt figure larger
+    # plt.rcParams['figure.figsize'] = [24, 24]
+    fig, axs = plt.subplots(1, 4, figsize=(20,5))
+
+    show_image(x[0], "original", ax=axs[0])
+
+    show_image(im_masked[0], "masked", ax = axs[1])
+
+    show_image(y[0], "reconstruction", axs[2])
+
+    show_image(im_paste[0], "reconstruction + visible", axs[3])
+
     if title is not None:
         fig.suptitle(title)
     if to_array: 
@@ -59,6 +95,43 @@ def test_model_result(model, img,mask_ratio=0.75, to_array=True, title=None):
         return np.asarray(buf)
     else:
         return fig
+    
+    
+def load_image(filename):
+    
+    test_img = np.array(Image.open((filename)))/255
+    test_img = torch.Tensor(test_img).permute(2,0,1)
+    return test_img
+
+
+
+
+
+
+
+# def test_model_result(model, img,mask_ratio=0.75, to_array=True, title=None):
+#     model.eval()
+#     with torch.no_grad():
+#         pred_img = model.forward(img, mask_ratio=mask_ratio)[1]
+
+#         recon_img = model.unpatchify(pred_img).detach()
+#         print(recon_img.shape)
+#         # transpose(1, 2, 0).squeeze(0).numpy()
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+#     ax1.imshow(img.squeeze(0).cpu().numpy().transpose(1, 2, 0))
+#     ax1.set_title("raw image")
+#     ax2.imshow(recon_img.squeeze(0).cpu().numpy().transpose(1, 2, 0))
+#     ax2.set_title("reconstructed image")
+#     if title is not None:
+#         fig.suptitle(title)
+#     if to_array: 
+#         canvas = FigureCanvasAgg(fig)
+#         canvas.draw()
+#         buf = canvas.buffer_rgba()
+#         plt.close()
+#         return np.asarray(buf)
+#     else:
+#         return fig
 
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
@@ -249,8 +322,9 @@ def main(args):
     # load test img for visualization
     if args.test_img_path is not None:
         test_img = load_image(args.test_img_path)
-        test_img = transforms.functional.resize(test_img, (224, 224)).unsqueeze(0)
+        test_img = transforms.functional.resize(test_img, (224, 224)).squeeze(0).permute(1,2,0)
         test_img = test_img.to(device)
+        print(type(test_img))
 
 
     # define the model
@@ -294,6 +368,7 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
+        model.train() # set to train 
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
         train_stats = train_one_epoch(
@@ -329,7 +404,7 @@ def main(args):
             ) as f:
                 f.write(json.dumps(log_stats) + "\n")
             if args.test_img_path is not None:
-                fig_array = test_model_result(model, test_img, mask_ratio=args.mask_ratio, title=f"test_img_{epoch}.png").transpose(2, 0, 1) # HWC -> CHW
+                fig_array = run_one_image(test_img.cpu(),model, mask_ratio=args.mask_ratio, title=f"test_img_{epoch}.png", to_array=True).transpose(2, 0, 1) # HWC -> CHW
                 print(fig_array.shape)
                 # if fig_array.ndim == 3: # add batch dimension
                 #     fig_array = np.expand_dims(fig_array, 0)
