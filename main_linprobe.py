@@ -285,7 +285,8 @@ def main(args):
                 loss_scaler=loss_scaler, epoch=epoch)
 
         test_stats = evaluate(data_loader_val, model, device)
-        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}% and AUC: {test_stats['auc']:.1f}%")
+
         # max_accuracy = max(max_accuracy, test_stats["acc1"])
         # print(f'Max accuracy: {max_accuracy:.2f}%')
         if log_writer is not None:
