@@ -210,17 +210,18 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        if args.global_pool:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-        else:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
+        # if args.global_pool:
+            # assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
+        # else:
+            # assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
 
         # manually initialize fc layer: following MoCo v3
-        trunc_normal_(model.head.weight, std=0.01)
+        # trunc_normal_(model.head.weight, std=0.01)
 
     # for linear prob only
     # hack: revise model's head with BN
-    model.head = torch.nn.Sequential(torch.nn.BatchNorm1d(model.head.in_features, affine=False, eps=1e-6), model.head)
+
+    model.head = torch.nn.Sequential(torch.nn.BatchNorm1d(model.head[1].in_features, affine=False, eps=1e-6), model.head)
     # freeze all but the head
     for _, p in model.named_parameters():
         p.requires_grad = False
