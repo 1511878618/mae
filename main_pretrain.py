@@ -260,7 +260,7 @@ def get_args_parser():
         "--dist_url", default="env://", help="url used to set up distributed training"
     )
     parser.add_argument("--test_img_path", default="./test_img/test.png")
-
+    parser.add_argument("--save-epochs", dest="save_epochs", default=20)
     return parser
 
 
@@ -381,7 +381,7 @@ def main(args):
             log_writer=log_writer,
             args=args,
         )
-        if args.output_dir and (epoch % 20 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir and (epoch % args.save_epochs == 0 or epoch + 1 == args.epochs):
             misc.save_model(
                 args=args,
                 model=model,
