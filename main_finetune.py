@@ -331,7 +331,9 @@ def main(args):
 
         if log_writer is not None:
             log_writer.add_scalar('perf/test_acc1', test_stats['acc1'], epoch)
-            log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
+            # log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
+            log_writer.add_scalar("perf/test_auc", test_stats['auc'], epoch)
+
             log_writer.add_scalar('perf/test_loss', test_stats['loss'], epoch)
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},

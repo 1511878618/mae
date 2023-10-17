@@ -132,4 +132,4 @@ def evaluate(data_loader, model, device):
     
     print('* Acc@1 {top1.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, losses=metric_logger.loss))
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}.update({"auc": auc.compute()})
+    return {**{k: meter.global_avg for k, meter in metric_logger.meters.items()}, "auc": auc.compute().item()}
