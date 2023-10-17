@@ -20,7 +20,7 @@ from timm.utils import accuracy
 
 import util.misc as misc
 import util.lr_sched as lr_sched
-
+import torchmetrics 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -101,7 +101,7 @@ def evaluate(data_loader, model, device):
 
     metric_logger = misc.MetricLogger(delimiter="  ")
     header = 'Test:'
-
+    auc = torchmetrics.AUROC(num_classes=2, task="multiclass")
     # switch to evaluation mode
     model.eval()
 
@@ -115,9 +115,12 @@ def evaluate(data_loader, model, device):
         with torch.cuda.amp.autocast():
             output = model(images)
             loss = criterion(output, target)
-
+        auc.update(torch.softmax(output, dim=1), target)
         # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+
+
         acc1 = accuracy(output, target, topk=(1,))[0]
+
         batch_size = images.shape[0]
         metric_logger.update(loss=loss.item())
         metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
@@ -126,6 +129,7 @@ def evaluate(data_loader, model, device):
     metric_logger.synchronize_between_processes()
     # print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
     #       .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
+    
     print('* Acc@1 {top1.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, losses=metric_logger.loss))
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}.update({"auc": auc.compute()})
