@@ -260,7 +260,7 @@ def get_args_parser():
         "--dist_url", default="env://", help="url used to set up distributed training"
     )
     parser.add_argument("--test_img_path", default="./test_img/test.png")
-    parser.add_argument("--save-epochs", dest="save_epochs", default=20)
+    parser.add_argument("--save-epochs", dest="save_epochs", default=20, type=int)
     return parser
 
 
