@@ -172,7 +172,7 @@ def main(args):
 
     dataset_train = build_dataset(is_train=True, args=args)
     dataset_val = build_dataset(is_train=False, args=args)
-
+    
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
         global_rank = misc.get_rank()
@@ -303,7 +303,7 @@ def main(args):
 
     if args.eval:
         test_stats = evaluate(data_loader_val, model, device)
-        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}% and AUC: {test_stats['auc']:.1f}%")
         exit(0)
 
     print(f"Start training for {args.epochs} epochs")
